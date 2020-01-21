@@ -1,9 +1,13 @@
 package parser
 
 import (
+	"fmt"
 	"github.com/influxdata/flux/ast"
 	"github.com/influxdata/flux/internal/token"
 	"github.com/influxdata/flux/libflux/go/libflux"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 )
 
 func parseFile(f *token.File, src []byte) (*ast.File, error) {
@@ -25,4 +29,19 @@ func parseFile(f *token.File, src []byte) (*ast.File, error) {
 		file.Imports = nil
 	}
 	return file, nil
+}
+
+func parseBytesToHandle(fset *token.FileSet, path string) (*libflux.ASTPkg, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	_ = fset.AddFile(filepath.Base(path), int(fi.Size()))
+	src, err := ioutil.ReadFile(path)
+	fmt.Println("current file src:", string(src))
+	if err != nil {
+		return nil, err
+	}
+	astFile := libflux.Parse(string(src))
+	return astFile, nil
 }

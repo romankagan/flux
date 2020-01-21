@@ -223,3 +223,110 @@ pub unsafe extern "C" fn flux_error_str(err: *mut flux_error_t) -> *mut c_char {
 pub unsafe extern "C" fn flux_free(err: *mut c_void) {
     Box::from_raw(err);
 }
+
+/// flux_merge_ast_pkg_files merges the files of a given in_pkg into the file
+/// vector of a given out_pkg. If there are problems with the package identifiers,
+/// then a panic may occur.
+#[no_mangle]
+pub unsafe extern "C" fn flux_merge_ast_pkg_files(
+    in_pkg: *mut flux_ast_pkg_t,
+    out_pkg: *mut flux_ast_pkg_t,
+) -> *mut flux_error_t {
+    let in_pkg = *Box::from_raw(in_pkg as *mut ast::Package);
+    let out_pkg = *Box::from_raw(out_pkg as *mut ast::Package);
+
+    match merge_files(in_pkg, out_pkg) {
+        Ok(_) => std::ptr::null_mut(),
+        Err(err) => {
+            let err_handle = ErrorHandle { err: Box::new(err) };
+            Box::into_raw(Box::new(err_handle)) as *mut flux_error_t
+        }
+    }
+}
+
+pub fn merge_files(in_pkg: ast::Package, out_pkg: ast::Package) -> Result<Vec<ast::File>, Error> {
+    // The package clause for all files within this package should be the same. Just grab the
+    // first one.
+    let pkg_clause = match &out_pkg.files[0].package {
+        Some(clause) => { &clause.name.name }
+        None => { return Err(Error::from("out_pkg does not have a package clause.")) }
+    };
+
+    // Check that all input files have a package clause that matches the output package
+    for file in &in_pkg.files {
+        let file_clause = match &file.package {
+            Some(clause) => { &clause.name.name }
+            None => { return Err(Error::from("Current file does not have a package clause.")) }
+        };
+
+        if pkg_clause != file_clause {
+            return Err(Error::from(format!(
+                "File's package clause {} does not match package output package clause {}",
+                file_clause,
+                pkg_clause
+            )))
+        }
+    }
+
+    // Modify the contents of out_pkg's file vector in place
+    let file_list = in_pkg.files.into_iter().fold(out_pkg.files, | mut file_list, file | {
+        file_list.push(file);
+        file_list
+    });
+
+    Ok(file_list)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{merge_files, ast};
+
+    #[test]
+    fn ok_merge_multi_file() {
+        let in_script= "package foo\na = 1\n";
+        let out_script= "package foo\nb = 2\n";
+
+        let in_file = crate::parser::parse_string("test", in_script);
+        let out_file = crate::parser::parse_string("test", out_script);
+        let in_pkg = ast::Package {
+            base: Default::default(),
+            path: "./test".to_string(),
+            package: "foo".to_string(),
+            files: vec![in_file.clone()]
+        };
+        let out_pkg = ast::Package {
+            base: Default::default(),
+            path: "./test".to_string(),
+            package: "foo".to_string(),
+            files: vec![out_file.clone()]
+        };
+        let got = merge_files(in_pkg, out_pkg);
+        let want = vec![out_file, in_file];
+        assert_eq!(want, got.expect("got does not equal want"));
+    }
+
+    #[test]
+    fn err_merge_multi_file() {
+        let in_script= "package foo\na = 1\n";
+        let out_script= "";
+
+        let in_file = crate::parser::parse_string("test", in_script);
+        let out_file = crate::parser::parse_string("test", out_script);
+        let in_pkg = ast::Package {
+            base: Default::default(),
+            path: "./test".to_string(),
+            package: "foo".to_string(),
+            files: vec![in_file.clone()]
+        };
+        let out_pkg = ast::Package {
+            base: Default::default(),
+            path: "./test".to_string(),
+            package: "foo".to_string(),
+            files: vec![out_file.clone()]
+        };
+        let got_err = merge_files(in_pkg, out_pkg).err().expect("should err");
+        let want_err = "out_pkg does not have a package clause.";
+        assert_eq!(want_err, got_err.to_string());
+    }
+}
+

@@ -98,6 +98,36 @@ func ParseToHandle(src []byte) *libflux.ASTPkg {
 	return libflux.Parse(string(src))
 }
 
+// ParseDir parses all files ending in '.flux' within the specified directory.
+// And handles merging of multi-file flux packages. Discovered packages are
+// returned within the file list of a libflux AST pointer.
+func ParseDirToHandle(fset *token.FileSet, path string) (*libflux.ASTPkg, error) {
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var astPkg *libflux.ASTPkg
+	for i, fi := range files {
+		//fmt.Println(i, fi.Name(), files)
+		if filepath.Ext(fi.Name()) != ".flux" {
+			continue
+		}
+		fp := filepath.Join(path, fi.Name())
+		nextPkg, err := parseBytesToHandle(fset, fp)
+		if err != nil {
+			return nil, err
+		}
+
+		if i == 0 {
+			astPkg = nextPkg
+		} else {
+			astPkg = libflux.MergePackages(nextPkg, astPkg)
+		}
+	}
+	return astPkg, nil
+}
+
 func packageName(f *ast.File) string {
 	if f.Package != nil && f.Package.Name != nil {
 		return f.Package.Name.Name

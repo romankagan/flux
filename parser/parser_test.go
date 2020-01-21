@@ -197,3 +197,109 @@ func TestParseTimeLiteral(t *testing.T) {
 		t.Errorf("ParseTimeLiteral failed: %s", cmp.Diff(want, got, asttest.IgnoreBaseNodeOptions...))
 	}
 }
+
+func TestParseDirToHandle(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "TestParseDirToHandle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	files := map[string][]byte{
+		"a.flux": []byte(`
+package foo
+
+a = 1
+`),
+		"b.flux": []byte(`
+package foo
+
+b = 2
+`),
+		"notes.txt": []byte(`
+this should be ignored
+`),
+		"c.flux": []byte(`
+package foo
+
+c = 3
+`)}
+
+	for name, src := range files {
+		f, err := os.Create(filepath.Join(tmpDir, name))
+		if err != nil {
+			t.Fatal(f)
+		}
+		f.Write(src)
+		err = f.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	fset := new(token.FileSet)
+	got_ast, _ := parser.ParseDirToHandle(fset, tmpDir)
+	got_bytes, err := got_ast.MarshalFB()
+	got := ast.DeserializeFromFlatBuffer(got_bytes)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+
+	want := &ast.Package{
+		Package: "foo",
+		Files: []*ast.File{
+			{
+				Name:     "a.flux",
+				Metadata: parserType,
+				Package: &ast.PackageClause{
+					Name: &ast.Identifier{Name: "foo"},
+				},
+				Body: []ast.Statement{
+					&ast.VariableAssignment{
+						ID:   &ast.Identifier{Name: "a"},
+						Init: &ast.IntegerLiteral{Value: 1},
+					},
+				},
+			},
+			{
+				Name:     "b.flux",
+				Metadata: parserType,
+				Package: &ast.PackageClause{
+					Name: &ast.Identifier{Name: "foo"},
+				},
+				Body: []ast.Statement{
+					&ast.VariableAssignment{
+						ID:   &ast.Identifier{Name: "b"},
+						Init: &ast.IntegerLiteral{Value: 2},
+					},
+				},
+			},
+			{
+				Name:     "c.flux",
+				Metadata: parserType,
+				Package: &ast.PackageClause{
+					Name: &ast.Identifier{Name: "foo"},
+				},
+				Body: []ast.Statement{
+					&ast.VariableAssignment{
+						ID:   &ast.Identifier{Name: "c"},
+						Init: &ast.IntegerLiteral{Value: 3},
+					},
+				},
+			},
+		},
+	}
+
+	t.Logf("formatted \n\n %v", ast.Format(got))
+
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	t.Errorf("about to compare %v %v", got, want)
+	if !cmp.Equal(got, want) {
+		t.Errorf(
+			"ParseDirToHandle unexpected packages -want/+got:\n",
+			//cmp.Diff(want, got, asttest.IgnoreBaseNodeOptions...),
+		)
+	}
+}

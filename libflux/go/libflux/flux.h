@@ -75,6 +75,10 @@ void flux_get_env_stdlib(struct flux_buffer_t *);
 // flux_ast_pkg_t* argument, so it should not be reused after calling this function.
 struct flux_error_t *flux_analyze(struct flux_ast_pkg_t *, struct flux_semantic_pkg_t **);
 
+// flux_ast_pkg_t merges the files of a given input AST package into the file vector of a
+// given output AST package. If there are errors, then a panic will occur.
+struct flux_error_t *flux_merge_ast_pkg_files(struct flux_ast_pkg_t *, struct flux_ast_pkg_t *);
+
 // flux_semantic_marshal_fb will marshal the given semantic graph as a flatbuffer into
 // the given buffer. If successful, memory will be allocated for the data
 // within the buffer and it is the caller's responsibility to free this
@@ -87,3 +91,4 @@ struct flux_error_t *flux_semantic_marshal_fb(struct flux_semantic_pkg_t *, stru
 #endif
 
 #endif
+
