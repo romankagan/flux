@@ -12,8 +12,8 @@ import (
 	"github.com/influxdata/flux/semantic/types"
 )
 
-func DeserializeFromFlatBuffer(buf []byte) (*Package, error) {
-	fbPkg := fbsemantic.GetRootAsPackage(buf, 0)
+func DeserializeFromFlatBuffer(buf []byte, offset uint) (*Package, error) {
+	fbPkg := fbsemantic.GetRootAsPackage(buf, flatbuffers.UOffsetT(offset))
 	p := &Package{}
 	if err := p.FromBuf(fbPkg); err != nil {
 		return nil, err

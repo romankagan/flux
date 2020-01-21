@@ -19,8 +19,6 @@ use std::os::raw::{c_char, c_void};
 
 use parser::Parser;
 
-pub const DEFAULT_PACKAGE_NAME: &str = "main";
-
 #[allow(non_camel_case_types)]
 pub mod ctypes {
     include!(concat!(env!("OUT_DIR"), "/ctypes.rs"));
@@ -72,6 +70,7 @@ impl From<semantic::nodes::Error> for Error {
 pub struct flux_buffer_t {
     pub data: *const u8,
     pub len: usize,
+    pub offset: usize,
 }
 
 /// # Safety
@@ -109,7 +108,8 @@ pub unsafe extern "C" fn flux_ast_marshal_json(
 
     let buffer = &mut *buf; // Unsafe
     buffer.len = data.len();
-    buffer.data = Box::into_raw(data.into_boxed_slice()) as *mut u8;
+    buffer.offset = 0;
+    buffer.data = Box::into_raw(data.into_boxed_slice()) as *const u8;
     std::ptr::null_mut()
 }
 
@@ -124,7 +124,7 @@ pub unsafe extern "C" fn flux_ast_marshal_fb(
     buf: *mut flux_buffer_t,
 ) -> *mut flux_error_t {
     let pkg = &*(ast as *mut ast::Package) as &ast::Package; // Unsafe
-    let (mut vec, offset) = match ast::flatbuffers::serialize(&pkg) {
+    let (vec, offset) = match ast::flatbuffers::serialize(&pkg) {
         Ok(vec_offset) => vec_offset,
         Err(err) => {
             let err: Error = err.into();
@@ -133,11 +133,10 @@ pub unsafe extern "C" fn flux_ast_marshal_fb(
         }
     };
 
-    // Note, split_off() does a copy: https://github.com/influxdata/flux/issues/2194
-    let data = vec.split_off(offset);
     let buffer = &mut *buf; // Unsafe
-    buffer.len = data.len();
-    buffer.data = Box::into_raw(data.into_boxed_slice()) as *mut u8;
+    buffer.len = vec.len();
+    buffer.offset = offset;
+    buffer.data = Box::into_raw(vec.into_boxed_slice()) as *const u8;
     std::ptr::null_mut()
 }
 
@@ -152,7 +151,7 @@ pub unsafe extern "C" fn flux_semantic_marshal_fb(
     buf: *mut flux_buffer_t,
 ) -> *mut flux_error_t {
     let pkg = &*(ast as *mut semantic::nodes::Package) as &semantic::nodes::Package; // Unsafe
-    let (mut vec, offset) = match semantic::flatbuffers::serialize(&pkg) {
+    let (vec, offset) = match semantic::flatbuffers::serialize(&pkg) {
         Ok(vec_offset) => vec_offset,
         Err(err) => {
             let err: Error = err.into();
@@ -161,11 +160,10 @@ pub unsafe extern "C" fn flux_semantic_marshal_fb(
         }
     };
 
-    // Note, split_off() does a copy: https://github.com/influxdata/flux/issues/2194
-    let data = vec.split_off(offset);
     let buffer = &mut *buf; // Unsafe
-    buffer.len = data.len();
-    buffer.data = Box::into_raw(data.into_boxed_slice()) as *mut u8;
+    buffer.len = vec.len();
+    buffer.offset = offset;
+    buffer.data = Box::into_raw(vec.into_boxed_slice()) as *const u8;
     std::ptr::null_mut()
 }
 
@@ -182,6 +180,6 @@ pub extern "C" fn flux_error_str(err: *mut flux_error_t) -> *mut c_char {
 /// For example, a double-free may occur if the function is called twice on
 /// the same raw pointer.
 #[no_mangle]
-pub unsafe extern "C" fn flux_free(err: *mut c_void) {
-    Box::from_raw(err);
+pub unsafe extern "C" fn flux_free(raw: *mut c_void) {
+    Box::from_raw(raw);
 }

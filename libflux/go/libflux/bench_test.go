@@ -106,7 +106,7 @@ func ParseAndDeserializeJSON(fluxFile string) error {
 func ParseAndReturnFB(fluxFile string) error {
 	p := libflux.Parse(fluxFile)
 	defer p.Free()
-	if _, err := p.MarshalFB(); err != nil {
+	if _, _, err := p.MarshalFB(); err != nil {
 		return err
 	}
 
@@ -116,11 +116,11 @@ func ParseAndReturnFB(fluxFile string) error {
 func ParseAndDeserializeFB(fluxFile string) error {
 	p := libflux.Parse(fluxFile)
 	defer p.Free()
-	bs, err := p.MarshalFB()
+	bs, offset, err := p.MarshalFB()
 	if err != nil {
 		return err
 	}
-	if _ = ast.DeserializeFromFlatBuffer(bs); err != nil {
+	if _ = ast.DeserializeFromFlatBuffer(bs, offset); err != nil {
 		return err
 	}
 

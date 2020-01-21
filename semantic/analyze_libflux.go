@@ -16,9 +16,9 @@ func AnalyzeSource(fluxSrc string) (*Package, error) {
 		return nil, err
 	}
 	defer sem.Free()
-	fb, err := sem.MarshalFB()
+	fb, offset, err := sem.MarshalFB()
 	if err != nil {
 		return nil, err
 	}
-	return DeserializeFromFlatBuffer(fb)
+	return DeserializeFromFlatBuffer(fb, offset)
 }

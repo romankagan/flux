@@ -49,7 +49,7 @@ func (p *ASTPkg) MarshalJSON() ([]byte, error) {
 	return data, nil
 }
 
-func (p *ASTPkg) MarshalFB() ([]byte, error) {
+func (p *ASTPkg) MarshalFB() ([]byte, uint, error) {
 	var buf C.struct_flux_buffer_t
 	if err := C.flux_ast_marshal_fb(p.ptr, &buf); err != nil {
 		defer C.flux_free(unsafe.Pointer(err))
@@ -57,12 +57,12 @@ func (p *ASTPkg) MarshalFB() ([]byte, error) {
 		defer C.flux_free(unsafe.Pointer(cstr))
 
 		str := C.GoString(cstr)
-		return nil, errors.New(str)
+		return nil, 0, errors.New(str)
 	}
 	defer C.flux_free(buf.data)
 
 	data := C.GoBytes(buf.data, C.int(buf.len))
-	return data, nil
+	return data, uint(C.uint(buf.offset)), nil
 }
 
 func (p *ASTPkg) Free() {
@@ -75,9 +75,8 @@ func (p *ASTPkg) Free() {
 // Parse will take a string and return a parsed source file.
 func Parse(s string) *ASTPkg {
 	cstr := C.CString(s)
-	defer C.free(unsafe.Pointer(cstr))
-
 	ptr := C.flux_parse(cstr)
+	C.free(unsafe.Pointer(cstr))
 	p := &ASTPkg{ptr: ptr}
 	runtime.SetFinalizer(p, free)
 	return p

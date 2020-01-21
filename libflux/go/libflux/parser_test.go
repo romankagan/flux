@@ -25,11 +25,11 @@ from(bucket: "telegraf")
 	}
 	fmt.Printf("json has %v bytes:\n%v\n", len(jsonBuf), string(jsonBuf))
 
-	fbBuf, err := ast.MarshalFB()
+	fbBuf, offset, err := ast.MarshalFB()
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("flatbuffer has %v bytes\n", len(fbBuf))
+	fmt.Printf("flatbuffer has %v bytes, offset %v.\n", len(fbBuf), offset)
 
 	ast.Free()
 }
