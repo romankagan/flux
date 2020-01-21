@@ -50,11 +50,12 @@ func TestAnalyze(t *testing.T) {
 			if tc.err != nil {
 				t.Fatalf("got no error, expected: %q", tc.err)
 			}
-			fbBuf, offset, err := sem.MarshalFB()
+			fbBuf, offset, freeFn, err := sem.MarshalFB()
 			if err != nil {
 				t.Fatal(err)
 			}
 			t.Logf("flatbuffer has %v bytes, offset %v.\n", len(fbBuf), offset)
+			freeFn()
 		})
 	}
 }

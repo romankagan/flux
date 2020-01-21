@@ -19,17 +19,18 @@ from(bucket: "telegraf")
 `
 	ast := libflux.Parse(text)
 
-	jsonBuf, err := ast.MarshalJSON()
+	jsonBuf, freeFn, err := ast.MarshalJSON()
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("json has %v bytes:\n%v\n", len(jsonBuf), string(jsonBuf))
+	freeFn()
 
-	fbBuf, offset, err := ast.MarshalFB()
+	fbBuf, offset, freeFn, err := ast.MarshalFB()
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("flatbuffer has %v bytes, offset %v.\n", len(fbBuf), offset)
-
+	freeFn()
 	ast.Free()
 }

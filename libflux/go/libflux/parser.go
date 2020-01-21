@@ -33,7 +33,7 @@ type ASTPkg struct {
 	ptr *C.struct_flux_ast_pkg_t
 }
 
-func (p *ASTPkg) MarshalJSON() ([]byte, error) {
+func (p *ASTPkg) MarshalJSON() ([]byte, func(), error) {
 	var buf C.struct_flux_buffer_t
 	if err := C.flux_ast_marshal_json(p.ptr, &buf); err != nil {
 		defer C.flux_free(unsafe.Pointer(err))
@@ -41,15 +41,14 @@ func (p *ASTPkg) MarshalJSON() ([]byte, error) {
 		defer C.flux_free(unsafe.Pointer(cstr))
 
 		str := C.GoString(cstr)
-		return nil, errors.New(str)
+		return nil, nil, errors.New(str)
 	}
-	defer C.flux_free(buf.data)
 
-	data := C.GoBytes(buf.data, C.int(buf.len))
-	return data, nil
+	data, freeFn := unwrapBuffer(buf)
+	return data, freeFn, nil
 }
 
-func (p *ASTPkg) MarshalFB() ([]byte, uint, error) {
+func (p *ASTPkg) MarshalFB() ([]byte, uint, func(), error) {
 	var buf C.struct_flux_buffer_t
 	if err := C.flux_ast_marshal_fb(p.ptr, &buf); err != nil {
 		defer C.flux_free(unsafe.Pointer(err))
@@ -57,12 +56,11 @@ func (p *ASTPkg) MarshalFB() ([]byte, uint, error) {
 		defer C.flux_free(unsafe.Pointer(cstr))
 
 		str := C.GoString(cstr)
-		return nil, 0, errors.New(str)
+		return nil, 0, nil, errors.New(str)
 	}
-	defer C.flux_free(buf.data)
 
-	data := C.GoBytes(buf.data, C.int(buf.len))
-	return data, uint(C.uint(buf.offset)), nil
+	data, freeFn := unwrapBuffer(buf)
+	return data, uint(C.uint(buf.offset)), freeFn, nil
 }
 
 func (p *ASTPkg) Free() {

@@ -20,7 +20,7 @@ type SemanticPkg struct {
 }
 
 // MarshalFB serializes the given semantic package into a flatbuffer.
-func (p *SemanticPkg) MarshalFB() ([]byte, uint, error) {
+func (p *SemanticPkg) MarshalFB() ([]byte, uint, func(), error) {
 	var buf C.struct_flux_buffer_t
 	if err := C.flux_semantic_marshal_fb(p.ptr, &buf); err != nil {
 		defer C.flux_free(unsafe.Pointer(err))
@@ -28,12 +28,11 @@ func (p *SemanticPkg) MarshalFB() ([]byte, uint, error) {
 		defer C.flux_free(unsafe.Pointer(cstr))
 
 		str := C.GoString(cstr)
-		return nil, 0, errors.New(str)
+		return nil, 0, nil, errors.New(str)
 	}
-	defer C.flux_free(buf.data)
 
-	data := C.GoBytes(buf.data, C.int(buf.len))
-	return data, uint(C.uint(buf.offset)), nil
+	data, freeFunc := unwrapBuffer(buf)
+	return data, uint(C.uint(buf.offset)), freeFunc, nil
 }
 
 // Free frees the memory allocated by Rust for the semantic graph.
