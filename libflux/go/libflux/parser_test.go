@@ -19,7 +19,7 @@ from(bucket: "telegraf")
 `
 	ast := libflux.Parse(text)
 
-	jsonBuf, freeFn, err := ast.MarshalJSON()
+	jsonBuf, freeFn, err := ast.ToJSON()
 	if err != nil {
 		panic(err)
 	}

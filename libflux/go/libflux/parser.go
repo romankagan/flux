@@ -33,7 +33,7 @@ type ASTPkg struct {
 	ptr *C.struct_flux_ast_pkg_t
 }
 
-func (p *ASTPkg) MarshalJSON() ([]byte, func(), error) {
+func (p *ASTPkg) ToJSON() ([]byte, func(), error) {
 	var buf C.struct_flux_buffer_t
 	if err := C.flux_ast_marshal_json(p.ptr, &buf); err != nil {
 		defer C.flux_free(unsafe.Pointer(err))

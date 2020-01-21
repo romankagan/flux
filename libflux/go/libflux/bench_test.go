@@ -81,7 +81,7 @@ func ParseReturnHandle(fluxFile string) error {
 func ParseReturnJSON(fluxFile string) error {
 	p := libflux.Parse(fluxFile)
 	defer p.Free()
-	_, freeFn, err := p.MarshalJSON()
+	_, freeFn, err := p.ToJSON()
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func ParseReturnJSON(fluxFile string) error {
 func ParseAndDeserializeJSON(fluxFile string) error {
 	p := libflux.Parse(fluxFile)
 	defer p.Free()
-	bs, freeFn, err := p.MarshalJSON()
+	bs, freeFn, err := p.ToJSON()
 	defer freeFn()
 	if err != nil {
 		return err
