@@ -77,10 +77,11 @@ impl From<semantic::nodes::Error> for Error {
 /// A buffer of flux source.
 #[repr(C)]
 pub struct flux_buffer_t {
-    /// A pointer to a byte array.
+    /// Pointer to the data contained within the buffer.
     pub data: *const u8,
     /// The length of the byte array.
     pub len: usize,
+    /// Offset of the beginning of the data.
     pub offset: usize,
 }
 
