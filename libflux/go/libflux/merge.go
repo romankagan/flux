@@ -7,7 +7,7 @@ package libflux
 import "C"
 
 // Merge packages merges the files of a given input package into a given
-// output package. If there are unrecoverable errors, a panic may occur.
+// output package.
 func MergePackages(inPkg *ASTPkg, outPkg *ASTPkg) *ASTPkg {
 	if inPkg == nil {
 		return outPkg

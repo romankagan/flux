@@ -225,8 +225,7 @@ pub unsafe extern "C" fn flux_free(err: *mut c_void) {
 }
 
 /// flux_merge_ast_pkg_files merges the files of a given in_pkg into the file
-/// vector of a given out_pkg. If there are problems with the package identifiers,
-/// then a panic may occur.
+/// vector of a given out_pkg.
 #[no_mangle]
 pub unsafe extern "C" fn flux_merge_ast_pkg_files(
     in_pkg: *mut flux_ast_pkg_t,
