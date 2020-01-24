@@ -289,12 +289,6 @@ c = 3
 			},
 		},
 	}
-
-	t.Logf("formatted \n\n %v", ast.Format(got))
-
-	if err != nil {
-		t.Errorf(err.Error())
-	}
 	t.Errorf("about to compare %v %v", got, want)
 	if !cmp.Equal(got, want) {
 		t.Errorf(

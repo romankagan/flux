@@ -252,7 +252,7 @@ pub fn merge_files(in_pkg: ast::Package, out_pkg: ast::Package) -> Result<Vec<as
         None => { return Err(Error::from("out_pkg does not have a package clause.")) }
     };
 
-    // Check that all input files have a package clause that matches the output package
+    // Check that all input files have a package clause that matches the output package.
     for file in &in_pkg.files {
         let file_clause = match &file.package {
             Some(clause) => { &clause.name.name }
@@ -268,12 +268,11 @@ pub fn merge_files(in_pkg: ast::Package, out_pkg: ast::Package) -> Result<Vec<as
         }
     }
 
-    // Modify the contents of out_pkg's file vector in place
+    // Modify the contents of out_pkg's file vector in place.
     let file_list = in_pkg.files.into_iter().fold(out_pkg.files, | mut file_list, file | {
         file_list.push(file);
         file_list
     });
-
     Ok(file_list)
 }
 

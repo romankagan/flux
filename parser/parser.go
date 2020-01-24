@@ -109,7 +109,6 @@ func ParseDirToHandle(fset *token.FileSet, path string) (*libflux.ASTPkg, error)
 
 	var astPkg *libflux.ASTPkg
 	for i, fi := range files {
-		//fmt.Println(i, fi.Name(), files)
 		if filepath.Ext(fi.Name()) != ".flux" {
 			continue
 		}

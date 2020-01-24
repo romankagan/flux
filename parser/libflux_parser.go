@@ -43,5 +43,6 @@ func parseBytesToHandle(fset *token.FileSet, path string) (*libflux.ASTPkg, erro
 		return nil, err
 	}
 	astFile := libflux.Parse(string(src))
+	fmt.Println("file", astFile)
 	return astFile, nil
 }
