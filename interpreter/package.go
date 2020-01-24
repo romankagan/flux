@@ -39,7 +39,8 @@ func NewPackageWithValues(name string, obj values.Object) *Package {
 }
 
 func NewPackage(name string) *Package {
-	return NewPackageWithValues(name, nil)
+	obj := values.NewObject(semantic.NewObjectType(nil))
+	return NewPackageWithValues(name, obj)
 }
 
 func (p *Package) Copy() *Package {

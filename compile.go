@@ -40,16 +40,12 @@ func Parse(flux string) (*ast.Package, error) {
 // Eval accepts a Flux script and evaluates it to produce a set of side effects (as a slice of values) and a scope.
 func Eval(ctx context.Context, flux string, opts ...ScopeMutator) ([]interpreter.SideEffect, values.Scope, error) {
 	h := parser.ParseToHandle([]byte(flux))
-	return evalHandle(ctx, h, opts...)
+	return defaultRuntime.evalHandle(ctx, h)
 }
 
 // EvalAST accepts a Flux AST and evaluates it to produce a set of side effects (as a slice of values) and a scope.
 func EvalAST(ctx context.Context, astPkg *ast.Package, opts ...ScopeMutator) ([]interpreter.SideEffect, values.Scope, error) {
-	h, err := parser.ToHandle(astPkg)
-	if err != nil {
-		return nil, nil, err
-	}
-	return evalHandle(ctx, h, opts...)
+	return defaultRuntime.Eval(ctx, astPkg)
 }
 
 func evalHandle(ctx context.Context, h *libflux.ASTPkg, opts ...ScopeMutator) ([]interpreter.SideEffect, values.Scope, error) {
@@ -704,30 +700,90 @@ func ToQueryTime(value values.Value) (Time, error) {
 }
 
 type importer struct {
+	r    *runtime
 	pkgs map[string]*interpreter.Package
 }
 
 func (imp *importer) Copy() *importer {
-	packages := make(map[string]*interpreter.Package, len(imp.pkgs))
-	for k, v := range imp.pkgs {
-		packages[k] = v.Copy()
-	}
-	return &importer{
-		pkgs: packages,
-	}
+	return &importer{r: imp.r}
 }
 
-func (imp *importer) Import(path string) (semantic.MonoType, bool) {
-	p, ok := imp.pkgs[path]
+func (imp *importer) Import(path string) (semantic.MonoType, error) {
+	p, err := imp.ImportPackageObject(path)
+	if err != nil {
+		return semantic.MonoType{}, err
+	}
+	return p.Type(), nil
+}
+
+func (imp *importer) ImportPackageObject(path string) (*interpreter.Package, error) {
+	// If this package has been imported previously, return the import now.
+	if p, ok := imp.pkgs[path]; ok {
+		if p == nil {
+			return nil, errors.Newf(codes.Invalid, "detected cyclical import for package path %q", path)
+		}
+		return p, nil
+	}
+
+	// Mark down that we are currently evaluating this package
+	// so that we can detect a circular import.
+	if imp.pkgs == nil {
+		imp.pkgs = make(map[string]*interpreter.Package)
+	}
+	imp.pkgs[path] = nil
+
+	// If this package is part of the prelude, fill in a fake
+	// empty package to resolve cyclical imports.
+	for _, ppath := range prelude {
+		if ppath == path {
+			imp.pkgs[path] = interpreter.NewPackage(path)
+			break
+		}
+	}
+
+	// Find the ast package for the given import path.
+	astPkg, ok := imp.r.pkgs[path]
 	if !ok {
-		return semantic.MonoType{}, false
+		return nil, errors.Newf(codes.Invalid, "invalid import path %s", path)
 	}
-	return p.Type(), true
-}
 
-func (imp *importer) ImportPackageObject(path string) (*interpreter.Package, bool) {
-	p, ok := imp.pkgs[path]
-	return p, ok
+	if ast.Check(astPkg) > 0 {
+		err := ast.GetError(astPkg)
+		return nil, errors.Wrapf(err, codes.Inherit, "failed to parse builtin package %q", path)
+	}
+
+	// Analyze the package using the semantic analyzer.
+	ap, err := parser.ToHandle(astPkg)
+	if err != nil {
+		return nil, err
+	}
+
+	root, err := semantic.AnalyzePackage(ap)
+	if err != nil {
+		return nil, err
+	}
+
+	// Construct the prelude scope from the prelude paths.
+	// If we are importing part of the prelude, we do not
+	// include it as part of the prelude and will stop
+	// including values as soon as we hit the prelude.
+	// This allows us to import all previous paths when loading
+	// the prelude, but avoid a circular import.
+	scope, err := imp.r.newScopeFor(path, imp)
+	if err != nil {
+		return nil, err
+	}
+
+	// Run the interpreter on the package to construct the values
+	// created by the package. Pass in the previously initialized
+	// packages as importable packages as we evaluate these in order.
+	itrp := interpreter.NewInterpreter(nil)
+	if _, err := itrp.Eval(context.Background(), root, scope, imp); err != nil {
+		return nil, err
+	}
+	obj := newObjectFromScope(scope)
+	imp.pkgs[path] = interpreter.NewPackageWithValues(itrp.PackageName(), obj)
+	return imp.pkgs[path], nil
 }
 
 // packageOrder determines a safe order to process builtin packages such that all dependent packages are previously processed.
@@ -750,6 +806,20 @@ func packageOrder(prelude []string, pkgs map[string]*ast.Package) (order []*ast.
 		}
 	}
 	return
+}
+
+func newObjectFromScope(scope values.Scope) values.Object {
+	obj, _ := values.BuildObject(func(set values.ObjectSetter) error {
+		scope.LocalRange(func(k string, v values.Value) {
+			// Packages should not expose the packages they import.
+			if _, ok := v.(values.Package); ok {
+				return
+			}
+			set(k, v)
+		})
+		return nil
+	})
+	return obj
 }
 
 func insertPkg(pkg *ast.Package, pkgs map[string]*ast.Package, order []*ast.Package) (_ []*ast.Package, err error) {
